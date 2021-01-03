@@ -1,34 +1,40 @@
 use protobuf::descriptor::FileDescriptorSet;
-use protobuf::CodedInputStream;
 use serde::Serializer;
-
-use serde_protobuf::de::Deserializer;
+use serde_protobuf::de::DeserializerBuilder;
 use serde_protobuf::descriptor::Descriptors;
 
-pub struct PqDecoder<'a> {
-    pub descriptors: Descriptors,
-    pub message_type: &'a str,
+pub struct PqDecoderBuilder {
+    descriptors: Descriptors,
 }
 
-impl<'a> PqDecoder<'a> {
-    pub fn new(loaded_descs: Vec<FileDescriptorSet>, message_type: &str) -> PqDecoder<'_> {
+pub struct PqDecoder<'a> {
+    deserializer_builder: DeserializerBuilder<'a>,
+}
+
+impl PqDecoderBuilder {
+    pub fn new(loaded_descs: Vec<FileDescriptorSet>) -> Self {
         let mut descriptors = Descriptors::new();
         for fdset in loaded_descs {
             descriptors.add_file_set_proto(&fdset);
         }
         descriptors.resolve_refs();
-        PqDecoder {
-            descriptors,
-            message_type,
-        }
+        Self { descriptors }
     }
 
-    pub fn transcode_message<S: Serializer>(&self, data: &[u8], out: S) {
-        let stream = CodedInputStream::from_bytes(data);
-        let mut deserializer =
-            Deserializer::for_named_message(&self.descriptors, self.message_type, stream)
-                .expect("could not init deserializer");
+    pub fn resolve_type<'a>(&'a self, message_type: &str) -> PqDecoder<'a> {
+        PqDecoder {
+            deserializer_builder: DeserializerBuilder::for_named_message(
+                &self.descriptors,
+                message_type,
+            )
+            .expect("The provided message type was invalid"),
+        }
+    }
+}
 
-        serde_transcode::transcode(&mut deserializer, out).unwrap();
+impl<'a> PqDecoder<'a> {
+    pub fn transcode_message<'b, S: Serializer>(&mut self, data: &[u8], out: S) {
+        let deserializer = self.deserializer_builder.for_input(data);
+        serde_transcode::transcode(deserializer, out).unwrap();
     }
 }

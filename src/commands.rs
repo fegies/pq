@@ -5,8 +5,8 @@ use serde_json::ser::Serializer;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use crate::decode::PqDecoder;
 use crate::discovery::{compile_descriptors_from_proto, get_loaded_descriptors};
+use crate::decode::PqDecoderBuilder;
 use crate::formatter::CustomFormatter;
 
 use stream_delimit::byte_consumer::ByteConsumer;
@@ -57,13 +57,17 @@ impl CommandRunner {
     }
 
     pub fn run_byte(self, matches: &ArgMatches<'_>) {
-        if unsafe { libc::isatty(0) != 0 } {
-            panic!("pq expects input to be piped from stdin");
-        }
+        // if unsafe { libc::isatty(0) != 0 } {
+        //     panic!("pq expects input to be piped from stdin");
+        // }
         let stream_type = str_to_streamtype(matches.value_of("STREAM").unwrap_or("single"))
             .expect("Couldn't convert str to streamtype");
         decode_or_convert(
             ByteConsumer::new(io::stdin(), stream_type),
+            // ByteConsumer::new(
+            //     std::fs::File::open("tests/samples/dog").unwrap(),
+            //     stream_type,
+            // ),
             matches,
             self.descriptors,
         )
@@ -102,7 +106,8 @@ fn decode_or_convert<T: Iterator<Item = Vec<u8>> + FramedRead>(
                 .expect("Must supply --msgtype or --convert")
         );
 
-        let decoder = PqDecoder::new(descriptors, &msgtype);
+        let decoder_builder = PqDecoderBuilder::new(descriptors);
+        let mut decoder = decoder_builder.resolve_type(&msgtype);
         let mut formatter = CustomFormatter::new(out_is_tty);
         let stdout_ = stdout.lock();
         let mut serializer = Serializer::with_formatter(stdout_, &mut formatter);

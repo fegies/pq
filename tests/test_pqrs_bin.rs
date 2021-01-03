@@ -101,7 +101,7 @@ fn test_bad_input() {
         .fails()
         .and()
         .stderr()
-        .contains("protobuf error")
+        .contains("quick-protobuf err")
         .unwrap();
 }
 

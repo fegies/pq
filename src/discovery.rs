@@ -1,11 +1,10 @@
-use protobuf::descriptor::FileDescriptorSet;
-use protobuf::parse_from_reader;
 use std::{
     env,
     fs::{read_dir, File},
     path::PathBuf,
     process::Command,
 };
+use protobuf::{descriptor::FileDescriptorSet, Message};
 
 pub fn get_loaded_descriptors(
     additional_fdset_dirs: Vec<PathBuf>,
@@ -27,7 +26,7 @@ pub fn get_loaded_descriptors(
             Ok(x) => x,
             Err(e) => panic!("Couldn't open fdset file: {}", e),
         };
-        match parse_from_reader(&mut fdset_file) {
+        match FileDescriptorSet::parse_from_reader(&mut fdset_file) {
             Err(_) => continue,
             Ok(x) => descriptors.push(x),
         }
